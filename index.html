@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LESNOY · Маркетинг · ежемесячный отчёт</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!--
+  LESNOY · Ежемесячный маркетинговый отчёт.
+  Приложение рендерит отчёт из данных месяца (JSON).
+  Без ключей Supabase работает демо-режим из сида (seed.js).
+  Дизайн и структура — по утверждённому макету (maket.html), не менять без запроса.
+-->
+<style>
+  :root{
+    --canopy:#152820; --canopy-2:#1E3A2C;
+    --paper:#F4F1E6; --card:#FFFFFF;
+    --ink:#20281F; --ink-soft:#5C6657; --line:#DDD8C6;
+    --moss:#3E6B4F;
+    --amber:#C98A2D; --amber-soft:#F3E4C8;
+    --fir:#2E6E6A;  --fir-soft:#D8E8E4;
+    --good:#3E7A4C; --bad:#A6432F;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Manrope',system-ui,sans-serif;background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .num{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+
+  /* ==== ШАПКА ==== */
+  header{background:radial-gradient(ellipse 120% 90% at 50% -20%, var(--canopy-2), var(--canopy) 70%);color:#EDEAD9;padding:48px 24px 0;position:relative;overflow:hidden}
+  header .rings{position:absolute;inset:auto -140px -260px auto;width:560px;height:560px;opacity:.14;pointer-events:none}
+  .head-inner{max-width:1060px;margin:0 auto;position:relative}
+  .brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .brand h1{font-family:'Prata',serif;font-weight:400;font-size:clamp(30px,5vw,48px);letter-spacing:.14em}
+  .brand .division{font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:#B9C4AE}
+  .period{margin-top:18px;display:inline-flex;align-items:center;gap:10px;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:#E4D9B8}
+  .period::before{content:'';width:34px;height:1px;background:#E4D9B8;opacity:.6}
+
+  nav{max-width:1060px;margin:26px auto 0;display:flex;gap:6px}
+  .tab-btn{appearance:none;border:0;cursor:pointer;font-family:inherit;font-weight:700;font-size:15px;padding:14px 26px;border-radius:12px 12px 0 0;background:rgba(244,241,230,.10);color:#D8DCC8;transition:background .2s,color .2s}
+  .tab-btn:hover{background:rgba(244,241,230,.20)}
+  .tab-btn:focus-visible{outline:2px solid #E4D9B8;outline-offset:-2px}
+  .tab-btn.active{background:var(--paper);color:var(--ink)}
+  .tab-btn .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+  .dot-sum{background:var(--moss)} .dot-tas{background:var(--amber)} .dot-bis{background:var(--fir)}
+
+  /* ==== ПАНЕЛЬ УПРАВЛЕНИЯ ==== */
+  .toolbar{max-width:1060px;margin:0 auto;padding:18px 24px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .toolbar select,.toolbar button{font-family:inherit;font-size:14px;font-weight:600;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+  .toolbar button:hover:not(:disabled){border-color:var(--moss)}
+  .toolbar button:disabled{opacity:.45;cursor:not-allowed}
+  .toolbar .ghost{background:transparent}
+  .toolbar .spacer{flex:1}
+  .status{width:100%;font-size:12px;color:var(--ink-soft)}
+  .status .pill{display:inline-block;padding:2px 10px;border-radius:20px;font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;background:#E4E1D3;color:#5C6657;margin-right:8px}
+
+  main{max-width:1060px;margin:0 auto;padding:26px 24px 80px}
+  .panel{display:none}
+  .panel.active{display:block;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){.panel.active{animation:none}}
+
+  h2.section{font-family:'Prata',serif;font-weight:400;font-size:24px;margin:44px 0 6px;display:flex;align-items:center;gap:12px}
+  h2.section:first-child{margin-top:0}
+  h2.small{font-size:19px}
+  h2.section::after{content:'';flex:1;height:1px;background:var(--line)}
+  .section-note{font-size:13px;color:var(--ink-soft);margin-bottom:18px}
+
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px 16px}
+  .metric .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .metric .value{font-size:28px;font-weight:700;margin-top:6px;line-height:1.1}
+  .metric .value .unit{font-size:15px;font-weight:500;color:var(--ink-soft);margin-left:2px}
+  .metric .delta{font-size:13px;margin-top:6px;font-weight:600}
+  .metric .note{font-size:12px;margin-top:6px;color:var(--ink-soft);font-weight:500;line-height:1.4}
+  .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--ink-soft);font-weight:500}
+  .metric.hero{border-top:3px solid var(--moss)}
+  .tashkent .metric.hero{border-top-color:var(--amber)}
+  .bishkek .metric.hero{border-top-color:var(--fir)}
+
+  .table-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:680px}
+  th{text-align:left;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;padding:14px 16px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:12px 16px;border-bottom:1px solid #EEEADD;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.n{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.total td{font-weight:700;background:#FAF8EF}
+  .camp-name{font-weight:600}
+  .camp-tag{font-size:12px;color:var(--ink-soft);display:block;margin-top:2px}
+
+  .bar{height:8px;border-radius:4px;background:#EAE6D6;overflow:hidden;margin-top:8px}
+  .bar>span{display:block;height:100%;border-radius:4px;background:var(--moss)}
+  .tashkent .bar>span{background:var(--amber)}
+  .bishkek .bar>span{background:var(--fir)}
+
+  .findings{display:grid;gap:12px;margin-top:16px}
+  .finding{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--moss);border-radius:10px;padding:16px 20px;font-size:15px}
+  .finding.warn{border-left-color:var(--bad)} .finding.win{border-left-color:var(--good)}
+  .finding .who{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-right:8px;vertical-align:1px}
+  .who.tas{background:var(--amber-soft);color:#7C5312}
+  .who.bis{background:var(--fir-soft);color:#1E4A47}
+
+  footer{max-width:1060px;margin:0 auto;padding:0 24px 40px;font-size:12px;color:var(--ink-soft)}
+
+  /* ==== МОДАЛЬНЫЕ ОКНА (вход, роли) ==== */
+  .overlay{position:fixed;inset:0;background:rgba(21,40,32,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .overlay[hidden]{display:none}
+  .modal{background:var(--card);border-radius:var(--radius);padding:24px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .modal h3{font-family:'Prata',serif;font-weight:400;font-size:20px;margin-bottom:6px}
+  .modal-note{font-size:13px;color:var(--ink-soft);margin-bottom:14px}
+  .modal label{display:block;font-size:13px;font-weight:600;margin-bottom:10px}
+  .modal input{width:100%;margin-top:4px;padding:9px 12px;font:inherit;border:1px solid var(--line);border-radius:10px;background:#FDFCF7}
+  .modal-err{font-size:13px;min-height:18px;margin-bottom:6px;color:var(--bad)}
+  .modal-err.ok{color:var(--good)}
+  .modal-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .modal-btns button{font-family:inherit;font-size:14px;font-weight:600;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+  .modal-btns button:hover:not(:disabled){border-color:var(--moss)}
+  .modal-btns button:disabled{opacity:.45;cursor:wait}
+  .modal-btns .ghost{background:transparent}
+  .roles-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #EEEADD;font-size:14px}
+  .roles-row:last-child{border-bottom:0}
+  .roles-row .email{overflow-wrap:anywhere}
+  .roles-row select{font:inherit;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer}
+
+  @media (max-width:640px){
+    .tab-btn{padding:12px 14px;font-size:13px}
+    .metric .value{font-size:23px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ==== ШАПКА ==== -->
+<header>
+  <svg class="rings" viewBox="0 0 560 560" aria-hidden="true">
+    <g fill="none" stroke="#EDEAD9" stroke-width="1.5">
+      <circle cx="280" cy="280" r="40"/><circle cx="282" cy="278" r="72"/>
+      <circle cx="278" cy="282" r="106"/><circle cx="283" cy="279" r="142"/>
+      <circle cx="279" cy="281" r="180"/><circle cx="281" cy="280" r="220"/>
+      <circle cx="280" cy="282" r="258"/>
+    </g>
+  </svg>
+  <div class="head-inner">
+    <div class="brand">
+      <h1>LESNOY</h1>
+      <span class="division">Маркетинг · ежемесячный отчёт</span>
+    </div>
+    <div class="period" id="period">—</div>
+    <nav>
+      <button class="tab-btn active" data-tab="summary"><span class="dot dot-sum"></span>Сводка</button>
+      <button class="tab-btn" data-tab="tashkent"><span class="dot dot-tas"></span>Ташкент</button>
+      <button class="tab-btn" data-tab="bishkek"><span class="dot dot-bis"></span>Бишкек</button>
+    </nav>
+  </div>
+</header>
+
+<!-- ==== ПАНЕЛЬ УПРАВЛЕНИЯ ==== -->
+<div class="toolbar">
+  <select id="month-select" title="Месяц отчёта"></select>
+  <button id="btn-edit" disabled title="Появится на следующем шаге">✎ Редактировать</button>
+  <span class="spacer"></span>
+  <button class="ghost" id="btn-add-month" disabled title="Появится на следующем шаге">+ Месяц</button>
+  <button class="ghost" id="btn-backup">⬇ Резервная копия</button>
+  <button class="ghost" id="btn-auth" disabled title="Появится на следующем шаге">Войти</button>
+  <div class="status" id="status-line"></div>
+</div>
+
+<main>
+  <section id="summary" class="panel active"></section>
+  <section id="tashkent" class="panel tashkent"></section>
+  <section id="bishkek" class="panel bishkek"></section>
+</main>
+
+<footer id="footer"></footer>
+
+<!-- ==== КОНФИГУРАЦИЯ ====
+     Вставить Project URL и anon key из Supabase (Settings → API).
+     Пока стоят заглушки — приложение работает в демо-режиме из сида. -->
+<script>
+  const CONFIG = {
+    SUPABASE_URL: "ВСТАВЬ_PROJECT_URL",
+    SUPABASE_ANON_KEY: "ВСТАВЬ_ANON_KEY"
+  };
+</script>
+
+<script src="seed.js"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+   ============================================================ */
+const state = {
+  months: {},        // все загруженные месяцы: { '2026-06': {...} }
+  current: null,     // ключ выбранного месяца
+  demo: true         // демо-режим (ключи Supabase не заданы)
+};
+
+/* Ключи города → CSS-классы макета и подписи */
+const CITY_META = {
+  tas: { panel: "tashkent", who: "tas" },
+  bis: { panel: "bishkek",  who: "bis" }
+};
+
+const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь",
+                     "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+
+/* ============================================================
+   ФОРМАТИРОВАНИЕ ЧИСЕЛ (русская локаль: пробел — тысячи, запятая — десятичные)
+   ============================================================ */
+const DASH = "—";
+
+// целое: 1571255 → «1 571 255»
+function fmtInt(n){
+  return n == null ? DASH : Math.round(n).toLocaleString("ru-RU");
+}
+
+// доллары: 891.14 → «$891,14»
+function fmtUsd(n){
+  if (n == null) return DASH;
+  return "$" + n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// проценты: (12.35, 2) → «12,35%»
+function fmtPct(n, digits = 1){
+  if (n == null) return DASH;
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: digits, maximumFractionDigits: digits }) + "%";
+}
+
+// крупные числа: ≥ 1 млн → «4,15 <span>млн</span>», меньше — целиком
+function fmtBig(n){
+  if (n == null) return DASH;
+  if (n >= 1e6){
+    const v = (n / 1e6).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return v + ' <span class="unit">млн</span>';
+  }
+  return fmtInt(n);
+}
+
+// число со знаком: 2261 → «+2 261»
+function fmtSigned(n){
+  if (n == null) return DASH;
+  return (n > 0 ? "+" : n < 0 ? "−" : "") + fmtInt(Math.abs(n));
+}
+
+// процент со знаком: 13.0 → «+13,0%»
+function fmtSignedPct(n, digits = 1){
+  if (n == null) return DASH;
+  return (n > 0 ? "+" : n < 0 ? "−" : "") + fmtPct(Math.abs(n), digits);
+}
+
+// сумма в местной валюте: (4066000, 'сум') → «4 066 000 сум»
+function fmtLocal(n, currency){
+  return n == null ? `${DASH} ${currency}` : `${fmtInt(n)} ${currency}`;
+}
+
+// склонение: (890, ["подписка","подписки","подписок"]) → «подписок»
+function plural(n, forms){
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return forms[2];
+  if (b === 1) return forms[0];
+  if (b >= 2 && b <= 4) return forms[1];
+  return forms[2];
+}
+
+// класс дельты по знаку
+function deltaClass(n){
+  if (n == null || n === 0) return "flat";
+  return n > 0 ? "up" : "down";
+}
+
+/* ============================================================
+   АВТОМАТИЧЕСКИЕ РАСЧЁТЫ (спека: руками не вводятся)
+   ============================================================ */
+
+// прирост Instagram = подписки − отписки
+function smmGrowth(smm){
+  if (smm.follows == null || smm.unfollows == null) return null;
+  return smm.follows - smm.unfollows;
+}
+
+// цена подписчика = бюджет ÷ подписки
+function costPerSub(budget, subs){
+  if (budget == null || !subs) return null;
+  return budget / subs;
+}
+
+// безопасное деление в процентах
+function pctOf(part, total, ifZero = null){
+  if (part == null || !total) return ifZero;
+  return part / total * 100;
+}
+
+// сумма с учётом null (все null → null)
+function sumOf(values){
+  const nums = values.filter(v => v != null);
+  return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
+}
+
+/* ============================================================
+   РЕНДЕР: ОБЩИЕ КУСКИ
+   ============================================================ */
+
+function metricCard({ label, value, delta, deltaCls = "flat", note, hero = false, valueStyle = "", bar = null }){
+  const deltaHtml = delta ? `<div class="delta ${deltaCls}">${delta}</div>` : "";
+  const noteHtml  = note  ? `<div class="note">${note}</div>` : "";
+  const barHtml   = bar   ? `<div class="bar"><span style="width:${bar.width}%${bar.bad ? ";background:var(--bad)" : ""}"></span></div>` : "";
+  const style     = valueStyle ? ` style="${valueStyle}"` : "";
+  return `<div class="metric${hero ? " hero" : ""}">
+    <div class="label">${label}</div>
+    <div class="value num"${style}>${value}</div>${barHtml}${deltaHtml}${noteHtml}
+  </div>`;
+}
+
+/* ============================================================
+   РЕНДЕР: ТАБ ГОРОДА
+   Порядок блоков строго: СММ → PR → Таргет → Доставка → Отзывы
+   ============================================================ */
+
+function renderSmm(city){
+  const s = city.smm;
+  const growth = smmGrowth(s);
+  return `
+    <h2 class="section">СММ — Instagram</h2>
+    <div class="grid">
+      ${metricCard({ hero: true, label: "Подписчики", value: fmtInt(s.followers),
+        delta: `${fmtSignedPct(s.growthPct)} за месяц`, deltaCls: deltaClass(s.growthPct) })}
+      ${metricCard({ label: "Прирост", value: fmtSigned(growth),
+        delta: `${fmtInt(s.follows)} ${plural(s.follows, ["подписка","подписки","подписок"])} · ${fmtInt(s.unfollows)} ${plural(s.unfollows, ["отписка","отписки","отписок"])}` })}
+      ${metricCard({ label: "Просмотры", value: fmtBig(s.views),
+        delta: `${fmtPct(s.viewsAdsPct)} от рекламы` })}
+      ${metricCard({ label: "Охваченные аккаунты", value: fmtBig(s.reached),
+        delta: fmtSignedPct(s.reachedDeltaPct), deltaCls: deltaClass(s.reachedDeltaPct) })}
+    </div>
+    <div class="grid" style="margin-top:14px">
+      ${metricCard({ label: "Просмотры: подписчики / не подписчики",
+        value: s.viewsFollowersPct == null ? DASH : `${fmtPct(s.viewsFollowersPct)} / ${fmtPct(100 - s.viewsFollowersPct)}`,
+        valueStyle: "font-size:22px", bar: { width: s.viewsFollowersPct ?? 0 } })}
+      ${metricCard({ label: "Доля историй в просмотрах",
+        value: fmtPct(s.storiesPct), valueStyle: "font-size:22px", bar: { width: s.storiesPct ?? 0 } })}
+    </div>`;
+}
+
+function renderPr(city){
+  let rows, note = "";
+  if (city.pr.length){
+    rows = city.pr.map(p => `<tr>
+        <td><span class="camp-name">${p.hashtag}</span></td>
+        <td class="n">${fmtInt(p.reach)}</td>
+        <td class="n">${fmtLocal(p.amount, city.currency)}</td>
+      </tr>`).join("");
+    // итоги PR считаются автоматически
+    rows += `<tr class="total"><td>Итого</td>
+      <td class="n">${fmtInt(sumOf(city.pr.map(p => p.reach)))}</td>
+      <td class="n">${fmtLocal(sumOf(city.pr.map(p => p.amount)), city.currency)}</td></tr>`;
+  } else {
+    rows = `<tr><td colspan="3" style="color:var(--ink-soft)">Данных за месяц нет</td></tr>`;
+  }
+  return `
+    <h2 class="section">PR · Блогеры</h2>
+    <p class="section-note">Хэштег блогера — по нему отслеживаем публикации; охваты — суммарный охват размещений; сумма чека — счёт гостя (бартер) или стоимость размещения.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Блогер (хэштег)</th><th>Охваты</th><th>Сумма чека</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>${note}`;
+}
+
+// подпись кампании: ручной тег, а если его нет — авто CPC/CTR (когда есть данные)
+function campaignTag(c){
+  if (c.tag) return c.tag;
+  const cpc = (c.budget != null && c.clicks) ? c.budget / c.clicks : null;
+  const ctr = pctOf(c.clicks, c.impressions);
+  if (cpc == null || ctr == null) return "";
+  return `CPC ${fmtUsd(cpc)} · CTR ${fmtPct(ctr, 2)}`;
+}
+
+function renderTarget(city){
+  const m = city.target.meta;
+  const totalCps = costPerSub(m.budget, m.subs);
+
+  const campRow = c => {
+    const tag = campaignTag(c);
+    return `<tr>
+      <td><span class="camp-name">${c.name}</span>${tag ? `<span class="camp-tag">${tag}</span>` : ""}</td>
+      <td class="n">${fmtUsd(c.budget)}</td>
+      <td class="n">${fmtInt(c.reach)}</td>
+      <td class="n">${fmtInt(c.impressions)}</td>
+      <td class="n">${fmtInt(c.clicks)}</td>
+      <td class="n">${fmtInt(c.subs)}</td>
+      <td class="n">${costPerSub(c.budget, c.subs) == null ? DASH : fmtUsd(costPerSub(c.budget, c.subs))}</td>
+      <td class="n">${fmtInt(c.visits)}</td>
+    </tr>`;
+  };
+
+  return `
+    <h2 class="section">Таргетированная реклама · Instagram</h2>
+    <div class="grid">
+      ${metricCard({ hero: true, label: "Бюджет", value: fmtUsd(m.budget) })}
+      ${metricCard({ label: "Охват", value: fmtBig(m.reach), note: "уникальные люди, увидевшие рекламу" })}
+      ${metricCard({ label: "Показы", value: fmtBig(m.impressions), note: "все показы, один человек может увидеть несколько раз" })}
+      ${metricCard({ label: "Клики", value: fmtInt(m.clicks), note: "переходы по ссылке из объявления" })}
+      ${metricCard({ hero: true, label: "Подписки", value: fmtInt(m.subs),
+        delta: totalCps == null ? "" : `${fmtUsd(totalCps)} за подписчика` })}
+      ${metricCard({ label: "Визиты профиля", value: fmtInt(m.visits), note: "переходы в профиль Instagram из рекламы" })}
+    </div>
+
+    <h2 class="section small">Кампании</h2>
+    <p class="section-note">Названия — как в рекламном кабинете, заполняет таргетолог. Итоговый охват не равен сумме строк — аудитории кампаний пересекаются, итог берётся из кабинета.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Кампания</th><th>Бюджет</th><th>Охват</th><th>Показы</th><th>Клики</th><th>Подписки</th><th>Цена подписки</th><th>Визиты</th></tr></thead>
+        <tbody>
+          ${city.target.campaigns.map(campRow).join("")}
+          <tr class="total"><td>Итого</td>
+            <td class="n">${fmtUsd(m.budget)}</td>
+            <td class="n">${fmtInt(m.reach)}</td>
+            <td class="n">${fmtInt(m.impressions)}</td>
+            <td class="n">${fmtInt(m.clicks)}</td>
+            <td class="n">${fmtInt(m.subs)}</td>
+            <td class="n">${totalCps == null ? DASH : fmtUsd(totalCps)}</td>
+            <td class="n">${fmtInt(m.visits)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderDelivery(city){
+  const d = city.delivery;
+  if (!d) return "";
+  const ctr = pctOf(d.clicks, d.views);
+  const conv = pctOf(d.orders, d.clicks);
+  const costPerOrder = (d.costs != null && d.orders) ? d.costs / d.orders : null;
+  const drr = pctOf(d.costs, d.revenue);
+  return `
+    <h2 class="section">Доставка · Яндекс Еда CPA</h2>
+    <p class="section-note">Продвижение за период ${d.period}</p>
+    <div class="grid">
+      ${metricCard({ label: "Просмотры", value: fmtInt(d.views) })}
+      ${metricCard({ label: "Клики", value: fmtInt(d.clicks),
+        delta: ctr == null ? "" : `CTR ${fmtPct(ctr, 2)} — конверсия из просмотра в клик` })}
+      ${metricCard({ hero: true, label: "Заказы", value: fmtInt(d.orders),
+        delta: conv == null ? "" : `конверсия из клика в заказ ${fmtPct(conv, 2)}` })}
+      ${metricCard({ label: "Выручка от продвижения",
+        value: `${fmtInt(d.revenue)} <span class="unit">${city.currency}</span>`, valueStyle: "font-size:22px" })}
+      ${metricCard({ label: "Затраты",
+        value: `${fmtInt(d.costs)} <span class="unit">${city.currency}</span>`, valueStyle: "font-size:22px",
+        delta: costPerOrder == null ? "" : `${fmtInt(costPerOrder)} ${city.currency} за заказ` })}
+      ${metricCard({ hero: true, label: "Доля рекламных расходов (ДРР)", value: fmtPct(drr, 2),
+        delta: d.promoRevenuePct == null ? "" : `${fmtPct(d.promoRevenuePct)} от выручки доставки` })}
+    </div>`;
+}
+
+function renderReviews(city){
+  const r = city.reviews;
+  // проценты позитива/негатива считаются от общего числа
+  const posPct = pctOf(r.positive, r.total, 0);
+  const negPct = pctOf(r.negative, r.total, 0);
+  return `
+    <h2 class="section">Отзывы гостей</h2>
+    <div class="grid">
+      ${metricCard({ hero: true, label: "Всего за месяц", value: fmtInt(r.total),
+        delta: r.avgRating == null ? "" : `средняя оценка ${r.avgRating.toLocaleString("ru-RU")}` })}
+      ${metricCard({ label: "Позитив", value: fmtInt(r.positive), valueStyle: "color:var(--good)",
+        bar: { width: posPct ?? 0 }, delta: `${fmtPct(posPct)} от всех` })}
+      ${metricCard({ label: "Негатив", value: fmtInt(r.negative), valueStyle: "color:var(--bad)",
+        bar: { width: negPct ?? 0, bad: true }, delta: `${fmtPct(negPct)} от всех` })}
+    </div>
+    ${r.note ? `<div class="finding" style="margin-top:14px">${r.note}</div>` : ""}`;
+}
+
+function renderCity(city){
+  return renderSmm(city) + renderPr(city) + renderTarget(city) + renderDelivery(city) + renderReviews(city);
+}
+
+/* ============================================================
+   РЕНДЕР: СВОДКА (вся считается из данных городов, кроме выводов)
+   ============================================================ */
+
+function renderSummary(month){
+  const cities = Object.values(month.cities);
+  const [tas, bis] = [month.cities.tas, month.cities.bis];
+
+  // агрегаты по всем городам
+  const followers = sumOf(cities.map(c => c.smm.followers));
+  const growth    = sumOf(cities.map(c => smmGrowth(c.smm)));
+  const views     = sumOf(cities.map(c => c.smm.views));
+  const budget    = sumOf(cities.map(c => c.target.meta.budget));
+  const subs      = sumOf(cities.map(c => c.target.meta.subs));
+  const cps       = costPerSub(budget, subs);
+  const withDelivery = cities.filter(c => c.delivery);
+  const orders    = sumOf(withDelivery.map(c => c.delivery.orders));
+  const drr       = pctOf(sumOf(withDelivery.map(c => c.delivery.costs)),
+                          sumOf(withDelivery.map(c => c.delivery.revenue)));
+  const revTotal  = sumOf(cities.map(c => c.reviews.total));
+  const revPos    = sumOf(cities.map(c => c.reviews.positive));
+  const posPct    = pctOf(revPos, revTotal);
+
+  // карточки: порядок по спеке — СММ → таргет → доставка → отзывы
+  const cards = `
+    ${metricCard({ hero: true, label: "Аудитория Instagram", value: fmtInt(followers),
+      delta: `${fmtSigned(growth)} за месяц`, deltaCls: deltaClass(growth) })}
+    ${metricCard({ hero: true, label: "Просмотры Instagram", value: fmtBig(views),
+      delta: cities.map(c => stripUnit(fmtBig(c.smm.views))).join(" + ") })}
+    ${metricCard({ hero: true, label: "Бюджет таргета", value: fmtUsd(budget),
+      delta: cities.map(c => `${c.name} ${fmtUsd(c.target.meta.budget)}`).join(" · ") })}
+    ${metricCard({ hero: true, label: "Подписки из рекламы", value: fmtInt(subs),
+      delta: cps == null ? "" : `цена подписчика ${fmtUsd(cps)}` })}
+    ${orders == null ? "" : metricCard({ hero: true, label: "Заказы Яндекс Еда (CPA)", value: fmtInt(orders),
+      delta: drr == null ? "" : `доля рекламных расходов ${fmtPct(drr, 2)}` })}
+    ${metricCard({ hero: true, label: "Отзывы гостей", value: fmtInt(revTotal),
+      delta: posPct == null ? "" : `${fmtPct(posPct)} позитивных`, deltaCls: "up" })}`;
+
+  // таблица «Города рядом»
+  const row = (label, fn) => `<tr><td>${label}</td>${cities.map(c => `<td class="n">${fn(c)}</td>`).join("")}</tr>`;
+  const table = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Показатель</th>${cities.map(c => `<th>${c.name}</th>`).join("")}</tr></thead>
+        <tbody>
+          ${row("Аудитория Instagram", c => fmtInt(c.smm.followers))}
+          ${row("Прирост за месяц", c => `${fmtSigned(smmGrowth(c.smm))} (${fmtSignedPct(c.smm.growthPct)})`)}
+          ${row("Просмотры", c => fmtInt(c.smm.views))}
+          ${row("Доля просмотров от рекламы", c => fmtPct(c.smm.viewsAdsPct))}
+          ${row("Охваченные аккаунты", c => fmtInt(c.smm.reached))}
+          ${row("Бюджет таргета", c => fmtUsd(c.target.meta.budget))}
+          ${row("Подписки из рекламы", c => fmtInt(c.target.meta.subs))}
+          ${row("Цена подписчика", c => {
+            const v = costPerSub(c.target.meta.budget, c.target.meta.subs);
+            return v == null ? DASH : fmtUsd(v);
+          })}
+          ${row("Отзывы: позитив / всего", c => `${fmtInt(c.reviews.positive)} / ${fmtInt(c.reviews.total)}`)}
+          ${row("Доля негатива в отзывах", c => fmtPct(pctOf(c.reviews.negative, c.reviews.total)))}
+        </tbody>
+      </table>
+    </div>`;
+
+  // выводы месяца (пишутся руками)
+  const findings = month.findings.map(f => {
+    const city = f.city && month.cities[f.city];
+    const who = city ? `<span class="who ${CITY_META[f.city].who}">${city.name}</span>` : "";
+    const tone = f.tone === "win" ? " win" : f.tone === "warn" ? " warn" : "";
+    return `<div class="finding${tone}">${who}<b>${f.title || ""}</b> ${f.text}</div>`;
+  }).join("");
+
+  return `
+    <h2 class="section">Два города за месяц</h2>
+    <p class="section-note">Все цифры считаются автоматически из вкладок городов.</p>
+    <div class="grid">${cards}</div>
+    <h2 class="section">Города рядом</h2>
+    ${table}
+    <h2 class="section">Выводы месяца</h2>
+    <div class="findings">${findings}</div>`;
+}
+
+// «4,15 <span class="unit">млн</span>» → «4,15 млн» (для строки-подписи)
+function stripUnit(html){
+  return html.replace(/<[^>]+>/g, "");
+}
+
+/* ============================================================
+   РЕНДЕР: СТРАНИЦА ЦЕЛИКОМ
+   ============================================================ */
+
+function monthTitle(key){
+  const [y, m] = key.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+function render(){
+  const month = state.months[state.current];
+  if (!month) return;
+
+  const cityNames = Object.values(month.cities).map(c => c.name).join(" + ");
+  document.getElementById("period").textContent = `${monthTitle(state.current)} · ${cityNames}`;
+  document.getElementById("summary").innerHTML = renderSummary(month);
+  document.getElementById("tashkent").innerHTML = renderCity(month.cities.tas);
+  document.getElementById("bishkek").innerHTML = renderCity(month.cities.bis);
+  document.getElementById("footer").textContent =
+    `LESNOY · FIBONACCI FAMILY · Отчёт по маркетингу за ${monthTitle(state.current).toLowerCase()} · подготовлено внутренней командой`;
+
+  // селектор месяцев — только существующие месяцы
+  const sel = document.getElementById("month-select");
+  sel.innerHTML = Object.keys(state.months).sort().map(k =>
+    `<option value="${k}"${k === state.current ? " selected" : ""}>${monthTitle(k)}</option>`).join("");
+
+  // статусная строка
+  const status = document.getElementById("status-line");
+  if (state.demo){
+    status.innerHTML = `<span class="pill">демо</span>Ключи Supabase не заданы — показаны данные из сида, сохранение недоступно. Роли: просмотр (по умолчанию) · редактор · суперюзер.`;
+  } else {
+    status.innerHTML = `<span class="pill">просмотр</span>Режим просмотра.`;
+  }
+}
+
+/* ============================================================
+   ТУЛБАР
+   ============================================================ */
+
+document.getElementById("month-select").addEventListener("change", e => {
+  state.current = e.target.value;
+  render();
+});
+
+// «Резервная копия» — все месяцы одним JSON-файлом (доступно всем)
+document.getElementById("btn-backup").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(state.months, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `lesnoy-marketing-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+/* Переключение табов */
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
+});
+
+/* ============================================================
+   ЗАГРУЗКА ДАННЫХ
+   Ключи не вставлены → демо-режим из сида.
+   Подключение Supabase — следующий шаг (auth и роли).
+   ============================================================ */
+
+function init(){
+  const keysMissing = CONFIG.SUPABASE_URL.startsWith("ВСТАВЬ") || CONFIG.SUPABASE_ANON_KEY.startsWith("ВСТАВЬ");
+  state.demo = keysMissing;
+  state.months = SEED;
+  state.current = Object.keys(SEED).sort().pop();
+  render();
+}
+
+init();
+</script>
+
+</body>
+</html>
