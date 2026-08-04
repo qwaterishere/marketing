@@ -163,8 +163,36 @@
   <span class="spacer"></span>
   <button class="ghost" id="btn-add-month" disabled title="Появится на следующем шаге">+ Месяц</button>
   <button class="ghost" id="btn-backup">⬇ Резервная копия</button>
-  <button class="ghost" id="btn-auth" disabled title="Появится на следующем шаге">Войти</button>
+  <button class="ghost" id="btn-roles" hidden>Роли</button>
+  <button class="ghost" id="btn-auth">Войти</button>
   <div class="status" id="status-line"></div>
+</div>
+
+<!-- ==== ОКНО ВХОДА ==== -->
+<div class="overlay" id="auth-overlay" hidden>
+  <div class="modal">
+    <h3>Вход</h3>
+    <p class="modal-note">Вход нужен только тем, кто заполняет отчёт. Просмотр доступен всем без входа.</p>
+    <label>Email <input type="email" id="auth-email" autocomplete="username"></label>
+    <label>Пароль <input type="password" id="auth-pass" autocomplete="current-password"></label>
+    <div class="modal-err" id="auth-msg"></div>
+    <div class="modal-btns">
+      <button id="auth-login">Войти</button>
+      <button id="auth-signup" class="ghost">Зарегистрироваться</button>
+      <button id="auth-cancel" class="ghost">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==== ОКНО РОЛЕЙ (только для суперюзера) ==== -->
+<div class="overlay" id="roles-overlay" hidden>
+  <div class="modal">
+    <h3>Роли пользователей</h3>
+    <p class="modal-note">«Просмотр» — роль по умолчанию у всех, в том числе без входа. «Редактор» может менять данные и месяцы. «Суперюзер» — то же плюс назначение ролей.</p>
+    <div id="roles-list"></div>
+    <div class="modal-err" id="roles-msg"></div>
+    <div class="modal-btns"><button id="roles-close" class="ghost">Закрыть</button></div>
+  </div>
 </div>
 
 <main>
@@ -185,6 +213,7 @@
   };
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="seed.js"></script>
 <script>
 "use strict";
@@ -195,8 +224,15 @@
 const state = {
   months: {},        // все загруженные месяцы: { '2026-06': {...} }
   current: null,     // ключ выбранного месяца
-  demo: true         // демо-режим (ключи Supabase не заданы)
+  demo: true,        // демо-режим (ключи Supabase не заданы)
+  fromSeed: false,   // база пуста — показан сид как пример
+  user: null,        // текущий пользователь Supabase (null = не вошёл)
+  role: "viewer"     // 'viewer' | 'editor' | 'superuser'
 };
+
+let sb = null;       // клиент Supabase (null в демо-режиме)
+
+const ROLE_LABEL = { viewer: "просмотр", editor: "редактор", superuser: "суперюзер" };
 
 /* Ключи города → CSS-классы макета и подписи */
 const CITY_META = {
@@ -588,12 +624,37 @@ function render(){
   sel.innerHTML = Object.keys(state.months).sort().map(k =>
     `<option value="${k}"${k === state.current ? " selected" : ""}>${monthTitle(k)}</option>`).join("");
 
-  // статусная строка
+  renderStatus();
+}
+
+/* Статусная строка и кнопки тулбара — зависят от режима и роли */
+function renderStatus(){
   const status = document.getElementById("status-line");
   if (state.demo){
     status.innerHTML = `<span class="pill">демо</span>Ключи Supabase не заданы — показаны данные из сида, сохранение недоступно. Роли: просмотр (по умолчанию) · редактор · суперюзер.`;
+  } else if (!state.user){
+    const seedNote = state.fromSeed ? " В базе пока нет месяцев — показан пример из сида." : "";
+    status.innerHTML = `<span class="pill">просмотр</span>Режим просмотра.${seedNote}`;
   } else {
-    status.innerHTML = `<span class="pill">просмотр</span>Режим просмотра.`;
+    const seedNote = state.fromSeed ? " В базе пока нет месяцев — показан пример из сида." : "";
+    status.innerHTML = `<span class="pill">${ROLE_LABEL[state.role]}</span>${state.user.email}${seedNote}`;
+  }
+
+  const authBtn = document.getElementById("btn-auth");
+  authBtn.textContent = state.user ? "Выйти" : "Войти";
+  authBtn.disabled = state.demo;
+  authBtn.title = state.demo ? "Недоступно в демо-режиме" : "";
+
+  // «Роли» видит только суперюзер
+  document.getElementById("btn-roles").hidden = state.role !== "superuser";
+
+  // редактирование и месяцы — шаг 5; кнопки пока неактивны
+  const canEdit = !state.demo && (state.role === "editor" || state.role === "superuser");
+  const editHint = canEdit ? "Появится на следующем шаге" : "Только для редакторов";
+  for (const id of ["btn-edit", "btn-add-month"]){
+    const b = document.getElementById(id);
+    b.disabled = true;
+    b.title = editHint;
   }
 }
 
@@ -627,16 +688,157 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 });
 
 /* ============================================================
-   ЗАГРУЗКА ДАННЫХ
-   Ключи не вставлены → демо-режим из сида.
-   Подключение Supabase — следующий шаг (auth и роли).
+   ВХОД И РОЛИ
    ============================================================ */
 
-function init(){
+const authOverlay = document.getElementById("auth-overlay");
+const authMsg = document.getElementById("auth-msg");
+
+document.getElementById("btn-auth").addEventListener("click", async () => {
+  if (state.user){
+    await sb.auth.signOut();          // выход; статус обновит onAuthStateChange
+    return;
+  }
+  authMsg.textContent = "";
+  authMsg.classList.remove("ok");
+  authOverlay.hidden = false;
+  document.getElementById("auth-email").focus();
+});
+
+document.getElementById("auth-cancel").addEventListener("click", () => { authOverlay.hidden = true; });
+
+// общий обработчик для «Войти» и «Зарегистрироваться»
+async function authSubmit(signup){
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-pass").value;
+  if (!email || !password){ authMsg.textContent = "Заполни email и пароль."; return; }
+
+  const btns = [document.getElementById("auth-login"), document.getElementById("auth-signup")];
+  btns.forEach(b => b.disabled = true);
+  authMsg.classList.remove("ok");
+  authMsg.textContent = "…";
+
+  const { error } = signup
+    ? await sb.auth.signUp({ email, password })
+    : await sb.auth.signInWithPassword({ email, password });
+
+  btns.forEach(b => b.disabled = false);
+
+  if (error){
+    // самые частые ошибки — по-русски
+    const map = {
+      "Invalid login credentials": "Неверный email или пароль.",
+      "Email not confirmed": "Email не подтверждён — проверь почту.",
+      "User already registered": "Такой пользователь уже есть — попробуй войти."
+    };
+    authMsg.textContent = map[error.message] || `Ошибка: ${error.message}`;
+    return;
+  }
+  if (signup){
+    authMsg.classList.add("ok");
+    authMsg.textContent = "Готово. Если вход не произошёл автоматически — подтверди email по письму и войди.";
+    return;
+  }
+  authOverlay.hidden = true;
+}
+
+document.getElementById("auth-login").addEventListener("click", () => authSubmit(false));
+document.getElementById("auth-signup").addEventListener("click", () => authSubmit(true));
+document.getElementById("auth-pass").addEventListener("keydown", e => { if (e.key === "Enter") authSubmit(false); });
+
+// роль текущего пользователя из базы (нет строки = просмотр)
+async function fetchRole(){
+  const { data, error } = await sb.rpc("get_my_role");
+  state.role = (!error && data) ? data : "viewer";
+}
+
+/* ---- окно ролей (только суперюзер) ---- */
+
+const rolesOverlay = document.getElementById("roles-overlay");
+const rolesMsg = document.getElementById("roles-msg");
+
+document.getElementById("btn-roles").addEventListener("click", async () => {
+  rolesOverlay.hidden = false;
+  await renderRolesList();
+});
+document.getElementById("roles-close").addEventListener("click", () => { rolesOverlay.hidden = true; });
+
+async function renderRolesList(){
+  const box = document.getElementById("roles-list");
+  rolesMsg.textContent = "";
+  box.textContent = "Загрузка…";
+  const { data, error } = await sb.rpc("list_users");
+  if (error){ box.textContent = ""; rolesMsg.textContent = `Не удалось загрузить список: ${error.message}`; return; }
+
+  box.innerHTML = data.map(u => `
+    <div class="roles-row">
+      <span class="email">${u.email}${u.user_id === state.user.id ? " <b>(ты)</b>" : ""}</span>
+      <select data-user="${u.user_id}">
+        ${Object.entries(ROLE_LABEL).map(([v, label]) =>
+          `<option value="${v}"${(u.role || "viewer") === v ? " selected" : ""}>${label}</option>`).join("")}
+      </select>
+    </div>`).join("");
+
+  box.querySelectorAll("select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const userId = sel.dataset.user;
+      const role = sel.value;
+      // защита от случайного снятия суперюзера с самого себя
+      if (userId === state.user.id && role !== "superuser" &&
+          !confirm("Ты снимаешь роль суперюзера с самого себя и потеряешь доступ к этому окну. Продолжить?")){
+        await renderRolesList();
+        return;
+      }
+      rolesMsg.textContent = "";
+      const { error: err } = role === "viewer"
+        ? await sb.from("user_roles").delete().eq("user_id", userId)   // просмотр = отсутствие строки
+        : await sb.from("user_roles").upsert({ user_id: userId, role });
+      if (err){ rolesMsg.textContent = `Не сохранилось: ${err.message}`; await renderRolesList(); return; }
+      if (userId === state.user.id){ await fetchRole(); renderStatus(); }
+    });
+  });
+}
+
+/* ============================================================
+   ЗАГРУЗКА ДАННЫХ И СТАРТ
+   Ключи не вставлены → демо-режим из сида.
+   ============================================================ */
+
+// все месяцы из базы; пустая база → сид как пример
+async function loadMonths(){
+  const { data, error } = await sb.from("reports").select("month,data").order("month");
+  if (error || !data.length){
+    state.months = SEED;
+    state.fromSeed = true;
+    if (error) console.error("Не удалось загрузить отчёты:", error.message);
+  } else {
+    state.months = Object.fromEntries(data.map(r => [r.month, r.data]));
+    state.fromSeed = false;
+  }
+  state.current = Object.keys(state.months).sort().pop();
+}
+
+async function init(){
   const keysMissing = CONFIG.SUPABASE_URL.startsWith("ВСТАВЬ") || CONFIG.SUPABASE_ANON_KEY.startsWith("ВСТАВЬ");
-  state.demo = keysMissing;
-  state.months = SEED;
-  state.current = Object.keys(SEED).sort().pop();
+  state.demo = keysMissing || !window.supabase;   // нет CDN-библиотеки — тоже демо
+  if (state.demo){
+    state.months = SEED;
+    state.current = Object.keys(SEED).sort().pop();
+    render();
+    return;
+  }
+
+  sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+  // реагируем на вход/выход (событие INITIAL_SESSION придёт и при загрузке страницы)
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    state.user = session ? session.user : null;
+    state.role = "viewer";
+    if (state.user) await fetchRole();
+    renderStatus();
+  });
+
+  await loadMonths();
   render();
 }
 
