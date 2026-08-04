@@ -104,6 +104,20 @@
 
   footer{max-width:1060px;margin:0 auto;padding:0 24px 40px;font-size:12px;color:var(--ink-soft)}
 
+  /* ==== РЕЖИМ РЕДАКТИРОВАНИЯ ==== */
+  .edit-input{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;font-size:14px;padding:6px 8px;border:1px solid var(--moss);border-radius:8px;background:#FDFCF7;width:100%;max-width:170px;margin-top:6px}
+  .edit-input.text{font-family:'Manrope',system-ui,sans-serif}
+  .edit-input.wide{max-width:100%}
+  textarea.edit-input{resize:vertical;min-height:64px;line-height:1.5}
+  select.edit-input{cursor:pointer;width:auto}
+  table .edit-input{margin-top:0;max-width:120px}
+  .row-del{border:1px solid var(--line);background:transparent;color:var(--bad);border-radius:8px;padding:4px 10px;cursor:pointer;font-size:15px;line-height:1}
+  .row-del:hover{border-color:var(--bad)}
+  .row-add{border:1px dashed var(--moss);background:transparent;color:var(--moss);border-radius:10px;padding:8px 14px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;margin-top:10px}
+  .row-add:hover{background:#EDEFE2}
+  .edit-hint{font-size:12px;color:var(--ink-soft);margin-top:6px;font-weight:500}
+  .delivery-toggle{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink-soft);margin-bottom:14px;cursor:pointer}
+
   /* ==== МОДАЛЬНЫЕ ОКНА (вход, роли) ==== */
   .overlay{position:fixed;inset:0;background:rgba(21,40,32,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
   .overlay[hidden]{display:none}
@@ -159,9 +173,12 @@
 <!-- ==== ПАНЕЛЬ УПРАВЛЕНИЯ ==== -->
 <div class="toolbar">
   <select id="month-select" title="Месяц отчёта"></select>
-  <button id="btn-edit" disabled title="Появится на следующем шаге">✎ Редактировать</button>
+  <button id="btn-edit">✎ Редактировать</button>
+  <button id="btn-save" hidden>Сохранить в базу</button>
+  <button class="ghost" id="btn-cancel" hidden>Отмена</button>
   <span class="spacer"></span>
-  <button class="ghost" id="btn-add-month" disabled title="Появится на следующем шаге">+ Месяц</button>
+  <button class="ghost" id="btn-add-month">+ Месяц</button>
+  <button class="ghost" id="btn-del-month">Удалить месяц</button>
   <button class="ghost" id="btn-backup">⬇ Резервная копия</button>
   <button class="ghost" id="btn-roles" hidden>Роли</button>
   <button class="ghost" id="btn-auth">Войти</button>
@@ -227,7 +244,9 @@ const state = {
   demo: true,        // демо-режим (ключи Supabase не заданы)
   fromSeed: false,   // база пуста — показан сид как пример
   user: null,        // текущий пользователь Supabase (null = не вошёл)
-  role: "viewer"     // 'viewer' | 'editor' | 'superuser'
+  role: "viewer",    // 'viewer' | 'editor' | 'superuser'
+  editing: false,    // режим редактирования
+  draft: null        // черновик месяца (копия, правится инпутами)
 };
 
 let sb = null;       // клиент Supabase (null в демо-режиме)
@@ -307,6 +326,55 @@ function deltaClass(n){
   return n > 0 ? "up" : "down";
 }
 
+// экранирование пользовательского текста для вставки в HTML
+function esc(s){
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ============================================================
+   РЕДАКТИРОВАНИЕ: ЧЕРНОВИК И ИНПУТЫ
+   Каждый инпут привязан к пути в черновике (data-path),
+   значение пишется в черновик прямо при вводе.
+   ============================================================ */
+
+// «1 234,56» из инпута → 1234.56; пусто → null
+function parseNum(str){
+  const s = String(str).trim().replace(/\s/g, "").replace(",", ".");
+  if (!s || s === "—") return null;
+  const n = Number(s);
+  return isNaN(n) ? null : n;
+}
+
+// число → строка для инпута (запятая как в отчёте)
+function numToStr(n){
+  return n == null ? "" : String(n).replace(".", ",");
+}
+
+function getPath(obj, path){
+  return path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
+}
+
+function setPath(obj, path, val){
+  const keys = path.split(".");
+  const last = keys.pop();
+  keys.reduce((o, k) => o[k], obj)[last] = val;
+}
+
+// числовой инпут, привязанный к пути в черновике
+function inpNum(path){
+  return `<input class="edit-input" data-path="${path}" data-type="num" inputmode="decimal" value="${esc(numToStr(getPath(state.draft, path)))}">`;
+}
+
+// текстовый инпут
+function inpText(path, cls = ""){
+  return `<input class="edit-input text ${cls}" data-path="${path}" value="${esc(getPath(state.draft, path))}">`;
+}
+
+// карточка-метрика с инпутом (для режима редактирования)
+function editCard(label, path, hint = ""){
+  return `<div class="metric"><div class="label">${label}</div>${inpNum(path)}${hint ? `<div class="edit-hint">${hint}</div>` : ""}</div>`;
+}
+
 /* ============================================================
    АВТОМАТИЧЕСКИЕ РАСЧЁТЫ (спека: руками не вводятся)
    ============================================================ */
@@ -355,8 +423,26 @@ function metricCard({ label, value, delta, deltaCls = "flat", note, hero = false
    Порядок блоков строго: СММ → PR → Таргет → Доставка → Отзывы
    ============================================================ */
 
-function renderSmm(city){
+function renderSmm(city, ck){
   const s = city.smm;
+  if (state.editing){
+    const p = `cities.${ck}.smm.`;
+    return `
+    <h2 class="section">СММ — Instagram</h2>
+    <p class="section-note">Пустое поле = «нет данных». Прирост и доли в карточках считаются автоматически.</p>
+    <div class="grid">
+      ${editCard("Подписчики", p + "followers", "на конец месяца")}
+      ${editCard("Подписки за месяц", p + "follows")}
+      ${editCard("Отписки за месяц", p + "unfollows")}
+      ${editCard("Прирост, % за месяц", p + "growthPct", "из статистики Instagram")}
+      ${editCard("Просмотры", p + "views")}
+      ${editCard("Просмотры от рекламы, %", p + "viewsAdsPct")}
+      ${editCard("Охваченные аккаунты", p + "reached")}
+      ${editCard("Динамика охвата, %", p + "reachedDeltaPct")}
+      ${editCard("Доля просмотров подписчиков, %", p + "viewsFollowersPct")}
+      ${editCard("Доля историй в просмотрах, %", p + "storiesPct")}
+    </div>`;
+  }
   const growth = smmGrowth(s);
   return `
     <h2 class="section">СММ — Instagram</h2>
@@ -379,11 +465,29 @@ function renderSmm(city){
     </div>`;
 }
 
-function renderPr(city){
+function renderPr(city, ck){
+  if (state.editing){
+    const rows = city.pr.map((p, i) => `<tr>
+        <td>${inpText(`cities.${ck}.pr.${i}.hashtag`, "wide")}</td>
+        <td>${inpNum(`cities.${ck}.pr.${i}.reach`)}</td>
+        <td>${inpNum(`cities.${ck}.pr.${i}.amount`)}</td>
+        <td><button class="row-del" data-action="pr-del" data-city="${ck}" data-index="${i}" title="Удалить строку">×</button></td>
+      </tr>`).join("");
+    return `
+    <h2 class="section">PR · Блогеры</h2>
+    <p class="section-note">Сумма чека — в местной валюте (${city.currency}). Итог считается автоматически.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Блогер (хэштег)</th><th>Охваты</th><th>Сумма чека</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="4" style="color:var(--ink-soft)">Блогеров пока нет — добавь кнопкой ниже</td></tr>`}</tbody>
+      </table>
+    </div>
+    <button class="row-add" data-action="pr-add" data-city="${ck}">+ Блогер</button>`;
+  }
   let rows, note = "";
   if (city.pr.length){
     rows = city.pr.map(p => `<tr>
-        <td><span class="camp-name">${p.hashtag}</span></td>
+        <td><span class="camp-name">${esc(p.hashtag)}</span></td>
         <td class="n">${fmtInt(p.reach)}</td>
         <td class="n">${fmtLocal(p.amount, city.currency)}</td>
       </tr>`).join("");
@@ -407,21 +511,57 @@ function renderPr(city){
 
 // подпись кампании: ручной тег, а если его нет — авто CPC/CTR (когда есть данные)
 function campaignTag(c){
-  if (c.tag) return c.tag;
+  if (c.tag) return esc(c.tag);
   const cpc = (c.budget != null && c.clicks) ? c.budget / c.clicks : null;
   const ctr = pctOf(c.clicks, c.impressions);
   if (cpc == null || ctr == null) return "";
   return `CPC ${fmtUsd(cpc)} · CTR ${fmtPct(ctr, 2)}`;
 }
 
-function renderTarget(city){
+function renderTarget(city, ck){
   const m = city.target.meta;
   const totalCps = costPerSub(m.budget, m.subs);
+
+  if (state.editing){
+    const p = `cities.${ck}.target.meta.`;
+    const rows = city.target.campaigns.map((c, i) => {
+      const cp = `cities.${ck}.target.campaigns.${i}.`;
+      return `<tr>
+        <td>${inpText(cp + "name", "wide")}<div style="margin-top:6px">${inpText(cp + "tag", "wide")}</div><div class="edit-hint">имя · тег (пустой тег = авто CPC/CTR)</div></td>
+        <td>${inpNum(cp + "budget")}</td>
+        <td>${inpNum(cp + "reach")}</td>
+        <td>${inpNum(cp + "impressions")}</td>
+        <td>${inpNum(cp + "clicks")}</td>
+        <td>${inpNum(cp + "subs")}</td>
+        <td>${inpNum(cp + "visits")}</td>
+        <td><button class="row-del" data-action="camp-del" data-city="${ck}" data-index="${i}" title="Удалить кампанию">×</button></td>
+      </tr>`;
+    }).join("");
+    return `
+    <h2 class="section">Таргетированная реклама · Instagram</h2>
+    <p class="section-note">Итоги — из рекламного кабинета, не сумма строк (аудитории пересекаются). Бюджеты — в долларах. Цены подписчика считаются автоматически.</p>
+    <div class="grid">
+      ${editCard("Бюджет, $", p + "budget")}
+      ${editCard("Охват", p + "reach")}
+      ${editCard("Показы", p + "impressions")}
+      ${editCard("Клики", p + "clicks")}
+      ${editCard("Подписки", p + "subs")}
+      ${editCard("Визиты профиля", p + "visits")}
+    </div>
+    <h2 class="section small">Кампании</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Кампания</th><th>Бюджет $</th><th>Охват</th><th>Показы</th><th>Клики</th><th>Подписки</th><th>Визиты</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="8" style="color:var(--ink-soft)">Кампаний пока нет</td></tr>`}</tbody>
+      </table>
+    </div>
+    <button class="row-add" data-action="camp-add" data-city="${ck}">+ Кампания</button>`;
+  }
 
   const campRow = c => {
     const tag = campaignTag(c);
     return `<tr>
-      <td><span class="camp-name">${c.name}</span>${tag ? `<span class="camp-tag">${tag}</span>` : ""}</td>
+      <td><span class="camp-name">${esc(c.name)}</span>${tag ? `<span class="camp-tag">${tag}</span>` : ""}</td>
       <td class="n">${fmtUsd(c.budget)}</td>
       <td class="n">${fmtInt(c.reach)}</td>
       <td class="n">${fmtInt(c.impressions)}</td>
@@ -465,8 +605,27 @@ function renderTarget(city){
     </div>`;
 }
 
-function renderDelivery(city){
+function renderDelivery(city, ck){
   const d = city.delivery;
+  if (state.editing){
+    const p = `cities.${ck}.delivery.`;
+    const toggle = `<label class="delivery-toggle"><input type="checkbox" data-action="delivery-toggle" data-city="${ck}"${d ? " checked" : ""}> В этом городе есть блок доставки</label>`;
+    const fields = !d ? "" : `
+    <div class="metric" style="margin-bottom:14px;max-width:420px">
+      <div class="label">Период продвижения</div>${inpText(p + "period", "wide")}
+      <div class="edit-hint">например: 27.06 — 03.07</div>
+    </div>
+    <div class="grid">
+      ${editCard("Просмотры", p + "views")}
+      ${editCard("Клики", p + "clicks")}
+      ${editCard("Заказы", p + "orders")}
+      ${editCard(`Выручка от продвижения, ${city.currency}`, p + "revenue")}
+      ${editCard(`Затраты, ${city.currency}`, p + "costs")}
+      ${editCard("Доля от выручки доставки, %", p + "promoRevenuePct", "вводится из кабинета")}
+    </div>
+    <p class="edit-hint">CTR, конверсия в заказ, цена заказа и ДРР считаются автоматически.</p>`;
+    return `<h2 class="section">Доставка · Яндекс Еда CPA</h2>${toggle}${fields}`;
+  }
   if (!d) return "";
   const ctr = pctOf(d.clicks, d.views);
   const conv = pctOf(d.orders, d.clicks);
@@ -474,7 +633,7 @@ function renderDelivery(city){
   const drr = pctOf(d.costs, d.revenue);
   return `
     <h2 class="section">Доставка · Яндекс Еда CPA</h2>
-    <p class="section-note">Продвижение за период ${d.period}</p>
+    <p class="section-note">Продвижение за период ${esc(d.period)}</p>
     <div class="grid">
       ${metricCard({ label: "Просмотры", value: fmtInt(d.views) })}
       ${metricCard({ label: "Клики", value: fmtInt(d.clicks),
@@ -491,8 +650,25 @@ function renderDelivery(city){
     </div>`;
 }
 
-function renderReviews(city){
+function renderReviews(city, ck){
   const r = city.reviews;
+  if (state.editing){
+    const p = `cities.${ck}.reviews.`;
+    return `
+    <h2 class="section">Отзывы гостей</h2>
+    <p class="section-note">Проценты позитива и негатива считаются автоматически от общего числа.</p>
+    <div class="grid">
+      ${editCard("Всего за месяц", p + "total")}
+      ${editCard("Позитив", p + "positive")}
+      ${editCard("Негатив", p + "negative")}
+      ${editCard("Средняя оценка", p + "avgRating", "пусто — если нет")}
+    </div>
+    <div class="metric" style="margin-top:14px">
+      <div class="label">Комментарий к отзывам</div>
+      <textarea class="edit-input text wide" data-path="${p}note">${esc(r.note)}</textarea>
+      <div class="edit-hint">показывается плашкой под карточками; пусто — плашки нет</div>
+    </div>`;
+  }
   // проценты позитива/негатива считаются от общего числа
   const posPct = pctOf(r.positive, r.total, 0);
   const negPct = pctOf(r.negative, r.total, 0);
@@ -506,11 +682,12 @@ function renderReviews(city){
       ${metricCard({ label: "Негатив", value: fmtInt(r.negative), valueStyle: "color:var(--bad)",
         bar: { width: negPct ?? 0, bad: true }, delta: `${fmtPct(negPct)} от всех` })}
     </div>
-    ${r.note ? `<div class="finding" style="margin-top:14px">${r.note}</div>` : ""}`;
+    ${r.note ? `<div class="finding" style="margin-top:14px">${esc(r.note)}</div>` : ""}`;
 }
 
-function renderCity(city){
-  return renderSmm(city) + renderPr(city) + renderTarget(city) + renderDelivery(city) + renderReviews(city);
+function renderCity(month, ck){
+  const city = month.cities[ck];
+  return renderSmm(city, ck) + renderPr(city, ck) + renderTarget(city, ck) + renderDelivery(city, ck) + renderReviews(city, ck);
 }
 
 /* ============================================================
@@ -518,6 +695,33 @@ function renderCity(city){
    ============================================================ */
 
 function renderSummary(month){
+  if (state.editing){
+    const rows = month.findings.map((f, i) => `
+      <div class="finding" style="display:grid;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="edit-input" data-path="findings.${i}.city">
+            <option value=""${!f.city ? " selected" : ""}>— без города</option>
+            ${Object.entries(month.cities).map(([k, c]) =>
+              `<option value="${k}"${f.city === k ? " selected" : ""}>${esc(c.name)}</option>`).join("")}
+          </select>
+          <select class="edit-input" data-path="findings.${i}.tone">
+            <option value=""${!f.tone ? " selected" : ""}>нейтрально</option>
+            <option value="win"${f.tone === "win" ? " selected" : ""}>успех</option>
+            <option value="warn"${f.tone === "warn" ? " selected" : ""}>внимание</option>
+          </select>
+          <span class="spacer" style="flex:1"></span>
+          <button class="row-del" data-action="find-del" data-index="${i}" title="Удалить вывод">×</button>
+        </div>
+        <input class="edit-input text wide" data-path="findings.${i}.title" placeholder="Заголовок (выделяется жирным)" value="${esc(f.title)}">
+        <textarea class="edit-input text wide" data-path="findings.${i}.text" placeholder="Текст вывода">${esc(f.text)}</textarea>
+      </div>`).join("");
+    return `
+    <h2 class="section">Выводы месяца</h2>
+    <p class="section-note">Карточки и таблица «Города рядом» считаются автоматически из вкладок городов — они обновятся после сохранения. Руками пишутся только выводы.</p>
+    <div class="findings">${rows || `<div class="section-note">Выводов пока нет — добавь кнопкой ниже.</div>`}</div>
+    <button class="row-add" data-action="find-add">+ Вывод</button>`;
+  }
+
   const cities = Object.values(month.cities);
   const [tas, bis] = [month.cities.tas, month.cities.bis];
 
@@ -580,7 +784,7 @@ function renderSummary(month){
     const city = f.city && month.cities[f.city];
     const who = city ? `<span class="who ${CITY_META[f.city].who}">${city.name}</span>` : "";
     const tone = f.tone === "win" ? " win" : f.tone === "warn" ? " warn" : "";
-    return `<div class="finding${tone}">${who}<b>${f.title || ""}</b> ${f.text}</div>`;
+    return `<div class="finding${tone}">${who}<b>${esc(f.title)}</b> ${esc(f.text)}</div>`;
   }).join("");
 
   return `
@@ -608,14 +812,15 @@ function monthTitle(key){
 }
 
 function render(){
-  const month = state.months[state.current];
+  // в режиме редактирования всё рисуется из черновика
+  const month = state.editing ? state.draft : state.months[state.current];
   if (!month) return;
 
   const cityNames = Object.values(month.cities).map(c => c.name).join(" + ");
   document.getElementById("period").textContent = `${monthTitle(state.current)} · ${cityNames}`;
   document.getElementById("summary").innerHTML = renderSummary(month);
-  document.getElementById("tashkent").innerHTML = renderCity(month.cities.tas);
-  document.getElementById("bishkek").innerHTML = renderCity(month.cities.bis);
+  document.getElementById("tashkent").innerHTML = renderCity(month, "tas");
+  document.getElementById("bishkek").innerHTML = renderCity(month, "bis");
   document.getElementById("footer").textContent =
     `LESNOY · FIBONACCI FAMILY · Отчёт по маркетингу за ${monthTitle(state.current).toLowerCase()} · подготовлено внутренней командой`;
 
@@ -630,13 +835,14 @@ function render(){
 /* Статусная строка и кнопки тулбара — зависят от режима и роли */
 function renderStatus(){
   const status = document.getElementById("status-line");
-  if (state.demo){
+  const seedNote = state.fromSeed ? " В базе пока нет месяцев — показан пример из сида." : "";
+  if (state.editing){
+    status.innerHTML = `<span class="pill">редактирование</span>Изменения появятся у всех после «Сохранить в базу». «Отмена» — отбросить.`;
+  } else if (state.demo){
     status.innerHTML = `<span class="pill">демо</span>Ключи Supabase не заданы — показаны данные из сида, сохранение недоступно. Роли: просмотр (по умолчанию) · редактор · суперюзер.`;
   } else if (!state.user){
-    const seedNote = state.fromSeed ? " В базе пока нет месяцев — показан пример из сида." : "";
     status.innerHTML = `<span class="pill">просмотр</span>Режим просмотра.${seedNote}`;
   } else {
-    const seedNote = state.fromSeed ? " В базе пока нет месяцев — показан пример из сида." : "";
     status.innerHTML = `<span class="pill">${ROLE_LABEL[state.role]}</span>${state.user.email}${seedNote}`;
   }
 
@@ -648,13 +854,18 @@ function renderStatus(){
   // «Роли» видит только суперюзер
   document.getElementById("btn-roles").hidden = state.role !== "superuser";
 
-  // редактирование и месяцы — шаг 5; кнопки пока неактивны
+  // кнопки редактора
   const canEdit = !state.demo && (state.role === "editor" || state.role === "superuser");
-  const editHint = canEdit ? "Появится на следующем шаге" : "Только для редакторов";
-  for (const id of ["btn-edit", "btn-add-month"]){
+  const editHint = state.demo ? "Недоступно в демо-режиме" : "Только для редакторов";
+  const ed = state.editing;
+  document.getElementById("month-select").disabled = ed;
+  document.getElementById("btn-save").hidden = !ed;
+  document.getElementById("btn-cancel").hidden = !ed;
+  for (const id of ["btn-edit", "btn-add-month", "btn-del-month"]){
     const b = document.getElementById(id);
-    b.disabled = true;
-    b.title = editHint;
+    b.hidden = ed;
+    b.disabled = !canEdit;
+    b.title = canEdit ? "" : editHint;
   }
 }
 
@@ -685,6 +896,118 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.add("active");
     document.getElementById(btn.dataset.tab).classList.add("active");
   });
+});
+
+/* ============================================================
+   РЕДАКТИРОВАНИЕ МЕСЯЦА
+   ============================================================ */
+
+document.getElementById("btn-edit").addEventListener("click", () => {
+  // черновик — глубокая копия месяца; правки не видны никому до сохранения
+  state.draft = JSON.parse(JSON.stringify(state.months[state.current]));
+  state.editing = true;
+  render();
+});
+
+document.getElementById("btn-cancel").addEventListener("click", () => {
+  state.editing = false;
+  state.draft = null;
+  render();
+});
+
+document.getElementById("btn-save").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-save");
+  btn.disabled = true; btn.textContent = "Сохраняю…";
+  const month = state.current;
+  const { error } = await sb.from("reports").upsert({ month, data: state.draft });
+  btn.disabled = false; btn.textContent = "Сохранить в базу";
+  if (error){
+    alert("Не сохранилось: " + error.message);
+    return;                       // остаёмся в редактировании, правки не потеряны
+  }
+  state.editing = false;
+  state.draft = null;
+  await loadMonths();             // перечитать базу, чтобы видеть ровно то, что сохранилось
+  if (state.months[month]) state.current = month;
+  render();
+});
+
+// ввод в любой инпут/селект/текстарию редактирования → сразу в черновик
+for (const evt of ["input", "change"]){
+  document.addEventListener(evt, e => {
+    const el = e.target;
+    if (!state.editing || !el.dataset || !el.dataset.path) return;
+    const val = el.dataset.type === "num" ? parseNum(el.value) : el.value;
+    setPath(state.draft, el.dataset.path, val);
+  });
+}
+
+// кнопки добавления/удаления строк и переключатель доставки
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn || !state.editing) return;
+  const { action, city: ck, index } = btn.dataset;
+  const city = ck ? state.draft.cities[ck] : null;
+  switch (action){
+    case "pr-add":  city.pr.push({ hashtag: "", reach: null, amount: null }); break;
+    case "pr-del":  city.pr.splice(+index, 1); break;
+    case "camp-add": city.target.campaigns.push({ name: "", tag: "", budget: null, reach: null, impressions: null, clicks: null, subs: null, visits: null }); break;
+    case "camp-del": city.target.campaigns.splice(+index, 1); break;
+    case "find-add": state.draft.findings.push({ city: "", tone: "", title: "", text: "" }); break;
+    case "find-del": state.draft.findings.splice(+index, 1); break;
+    case "delivery-toggle":
+      city.delivery = city.delivery ? null
+        : { period: "", views: null, clicks: null, orders: null, revenue: null, costs: null, promoRevenuePct: null };
+      break;
+    default: return;
+  }
+  render();
+});
+
+/* ============================================================
+   СОЗДАНИЕ И УДАЛЕНИЕ МЕСЯЦЕВ
+   ============================================================ */
+
+// пустой месяц из структуры последнего: названия кампаний остаются, цифры пустые
+function blankFromMonth(src){
+  const m = JSON.parse(JSON.stringify(src));
+  for (const city of Object.values(m.cities)){
+    for (const k of Object.keys(city.smm)) city.smm[k] = null;
+    city.pr = [];
+    city.target.meta = { budget: null, reach: null, impressions: null, clicks: null, subs: null, visits: null };
+    city.target.campaigns = city.target.campaigns.map(c =>
+      ({ ...c, budget: null, reach: null, impressions: null, clicks: null, subs: null, visits: null }));
+    if (city.delivery) city.delivery = { period: "", views: null, clicks: null, orders: null, revenue: null, costs: null, promoRevenuePct: null };
+    city.reviews = { total: null, positive: null, negative: null, avgRating: null, note: "" };
+  }
+  m.findings = [];
+  return m;
+}
+
+document.getElementById("btn-add-month").addEventListener("click", async () => {
+  if (state.fromSeed){
+    alert("В базе ещё нет ни одного месяца. Сначала сохрани текущий: «✎ Редактировать» → «Сохранить в базу».");
+    return;
+  }
+  const keys = Object.keys(state.months).sort();
+  const [y, m] = keys[keys.length - 1].split("-").map(Number);
+  if (m >= 12){ alert("Декабрь уже есть — в этом году больше нет месяцев."); return; }
+  const next = `${y}-${String(m + 1).padStart(2, "0")}`;
+  if (!confirm(`Создать «${monthTitle(next)}»? Названия кампаний скопируются из последнего месяца, цифры будут пустыми.`)) return;
+  const { error } = await sb.from("reports").insert({ month: next, data: blankFromMonth(state.months[keys[keys.length - 1]]) });
+  if (error){ alert("Не создалось: " + error.message); return; }
+  await loadMonths();
+  state.current = next;
+  render();
+});
+
+document.getElementById("btn-del-month").addEventListener("click", async () => {
+  if (state.fromSeed){ alert("Этот месяц ещё не сохранён в базу — удалять нечего."); return; }
+  if (!confirm(`Удалить «${monthTitle(state.current)}» безвозвратно? Перед удалением стоит скачать резервную копию.`)) return;
+  const { error } = await sb.from("reports").delete().eq("month", state.current);
+  if (error){ alert("Не удалилось: " + error.message); return; }
+  await loadMonths();
+  render();
 });
 
 /* ============================================================
@@ -834,7 +1157,10 @@ async function init(){
   sb.auth.onAuthStateChange(async (_event, session) => {
     state.user = session ? session.user : null;
     state.role = "viewer";
-    if (state.user) await fetchRole();
+    if (state.user){
+      await fetchRole();
+      authOverlay.hidden = true;   // вход состоялся (в т.ч. сразу после регистрации) — окно больше не нужно
+    }
     renderStatus();
   });
 
