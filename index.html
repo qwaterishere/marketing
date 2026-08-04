@@ -841,7 +841,7 @@ function renderStatus(){
   } else if (state.demo){
     status.innerHTML = `<span class="pill">демо</span>Ключи Supabase не заданы — показаны данные из сида, сохранение недоступно. Роли: просмотр (по умолчанию) · редактор · суперюзер.`;
   } else if (!state.user){
-    status.innerHTML = `<span class="pill">просмотр</span>Режим просмотра.${seedNote}`;
+    status.innerHTML = `<span class="pill">просмотр</span>Режим просмотра.${seedNote}${authNotice ? " " + esc(authNotice) : ""}`;
   } else {
     status.innerHTML = `<span class="pill">${ROLE_LABEL[state.role]}</span>${state.user.email}${seedNote}`;
   }
@@ -1016,6 +1016,7 @@ document.getElementById("btn-del-month").addEventListener("click", async () => {
 
 const authOverlay = document.getElementById("auth-overlay");
 const authMsg = document.getElementById("auth-msg");
+let authNotice = "";   // подсказка в статусной строке после регистрации (до входа)
 
 document.getElementById("btn-auth").addEventListener("click", async () => {
   if (state.user){
@@ -1041,7 +1042,7 @@ async function authSubmit(signup){
   authMsg.classList.remove("ok");
   authMsg.textContent = "…";
 
-  const { error } = signup
+  const { data, error } = signup
     ? await sb.auth.signUp({ email, password })
     : await sb.auth.signInWithPassword({ email, password });
 
@@ -1058,8 +1059,13 @@ async function authSubmit(signup){
     return;
   }
   if (signup){
-    authMsg.classList.add("ok");
-    authMsg.textContent = "Готово. Если вход не произошёл автоматически — подтверди email по письму и войди.";
+    // окно закрываем сразу; если Supabase требует подтверждение почты —
+    // сессии ещё нет, подсказываем в статусной строке
+    authOverlay.hidden = true;
+    if (!data.session){
+      authNotice = `Письмо с подтверждением отправлено на ${email} — подтверди его и нажми «Войти».`;
+      renderStatus();
+    }
     return;
   }
   authOverlay.hidden = true;
@@ -1160,6 +1166,7 @@ async function init(){
     if (state.user){
       await fetchRole();
       authOverlay.hidden = true;   // вход состоялся (в т.ч. сразу после регистрации) — окно больше не нужно
+      authNotice = "";             // подсказка про письмо больше не актуальна
     }
     renderStatus();
   });
