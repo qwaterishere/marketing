@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LESNOY · Маркетинг · Июнь 2026 · МАКЕТ v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!--
+  СТАТИЧНЫЙ МАКЕТ v2. Все данные зашиты в разметку.
+  Порядок блоков в каждом городе: СММ → PR → Таргет → Доставка → Отзывы.
+  Каждый блок помечен комментарием ==== НАЗВАНИЕ ====
+-->
+<style>
+  :root{
+    --canopy:#152820; --canopy-2:#1E3A2C;
+    --paper:#F4F1E6; --card:#FFFFFF;
+    --ink:#20281F; --ink-soft:#5C6657; --line:#DDD8C6;
+    --moss:#3E6B4F;
+    --amber:#C98A2D; --amber-soft:#F3E4C8;
+    --fir:#2E6E6A;  --fir-soft:#D8E8E4;
+    --good:#3E7A4C; --bad:#A6432F;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Manrope',system-ui,sans-serif;background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .num{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+
+  /* ==== ШАПКА ==== */
+  header{background:radial-gradient(ellipse 120% 90% at 50% -20%, var(--canopy-2), var(--canopy) 70%);color:#EDEAD9;padding:48px 24px 0;position:relative;overflow:hidden}
+  header .rings{position:absolute;inset:auto -140px -260px auto;width:560px;height:560px;opacity:.14;pointer-events:none}
+  .head-inner{max-width:1060px;margin:0 auto;position:relative}
+  .brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .brand h1{font-family:'Prata',serif;font-weight:400;font-size:clamp(30px,5vw,48px);letter-spacing:.14em}
+  .brand .division{font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:#B9C4AE}
+  .period{margin-top:18px;display:inline-flex;align-items:center;gap:10px;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:#E4D9B8}
+  .period::before{content:'';width:34px;height:1px;background:#E4D9B8;opacity:.6}
+
+  nav{max-width:1060px;margin:26px auto 0;display:flex;gap:6px}
+  .tab-btn{appearance:none;border:0;cursor:pointer;font-family:inherit;font-weight:700;font-size:15px;padding:14px 26px;border-radius:12px 12px 0 0;background:rgba(244,241,230,.10);color:#D8DCC8;transition:background .2s,color .2s}
+  .tab-btn:hover{background:rgba(244,241,230,.20)}
+  .tab-btn:focus-visible{outline:2px solid #E4D9B8;outline-offset:-2px}
+  .tab-btn.active{background:var(--paper);color:var(--ink)}
+  .tab-btn .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+  .dot-sum{background:var(--moss)} .dot-tas{background:var(--amber)} .dot-bis{background:var(--fir)}
+
+  /* ==== ПАНЕЛЬ УПРАВЛЕНИЯ (в макете — только внешний вид) ==== */
+  .toolbar{max-width:1060px;margin:0 auto;padding:18px 24px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .toolbar select,.toolbar button{font-family:inherit;font-size:14px;font-weight:600;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+  .toolbar button:hover{border-color:var(--moss)}
+  .toolbar .ghost{background:transparent}
+  .toolbar .spacer{flex:1}
+  .status{width:100%;font-size:12px;color:var(--ink-soft)}
+  .status .pill{display:inline-block;padding:2px 10px;border-radius:20px;font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;background:#E4E1D3;color:#5C6657;margin-right:8px}
+
+  main{max-width:1060px;margin:0 auto;padding:26px 24px 80px}
+  .panel{display:none}
+  .panel.active{display:block;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){.panel.active{animation:none}}
+
+  h2.section{font-family:'Prata',serif;font-weight:400;font-size:24px;margin:44px 0 6px;display:flex;align-items:center;gap:12px}
+  h2.section:first-child{margin-top:0}
+  h2.small{font-size:19px}
+  h2.section::after{content:'';flex:1;height:1px;background:var(--line)}
+  .section-note{font-size:13px;color:var(--ink-soft);margin-bottom:18px}
+
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px 16px}
+  .metric .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .metric .value{font-size:28px;font-weight:700;margin-top:6px;line-height:1.1}
+  .metric .value .unit{font-size:15px;font-weight:500;color:var(--ink-soft);margin-left:2px}
+  .metric .delta{font-size:13px;margin-top:6px;font-weight:600}
+  .metric .note{font-size:12px;margin-top:6px;color:var(--ink-soft);font-weight:500;line-height:1.4}
+  .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--ink-soft);font-weight:500}
+  .metric.hero{border-top:3px solid var(--moss)}
+  .tashkent .metric.hero{border-top-color:var(--amber)}
+  .bishkek .metric.hero{border-top-color:var(--fir)}
+
+  .table-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:680px}
+  th{text-align:left;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;padding:14px 16px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:12px 16px;border-bottom:1px solid #EEEADD;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.n{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.total td{font-weight:700;background:#FAF8EF}
+  .camp-name{font-weight:600}
+  .camp-tag{font-size:12px;color:var(--ink-soft);display:block;margin-top:2px}
+
+  .bar{height:8px;border-radius:4px;background:#EAE6D6;overflow:hidden;margin-top:8px}
+  .bar>span{display:block;height:100%;border-radius:4px;background:var(--moss)}
+  .tashkent .bar>span{background:var(--amber)}
+  .bishkek .bar>span{background:var(--fir)}
+
+  .findings{display:grid;gap:12px;margin-top:16px}
+  .finding{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--moss);border-radius:10px;padding:16px 20px;font-size:15px}
+  .finding.warn{border-left-color:var(--bad)} .finding.win{border-left-color:var(--good)}
+  .finding .who{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-right:8px;vertical-align:1px}
+  .who.tas{background:var(--amber-soft);color:#7C5312}
+  .who.bis{background:var(--fir-soft);color:#1E4A47}
+
+  footer{max-width:1060px;margin:0 auto;padding:0 24px 40px;font-size:12px;color:var(--ink-soft)}
+
+  @media (max-width:640px){
+    .tab-btn{padding:12px 14px;font-size:13px}
+    .metric .value{font-size:23px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ==== ШАПКА ==== -->
+<header>
+  <svg class="rings" viewBox="0 0 560 560" aria-hidden="true">
+    <g fill="none" stroke="#EDEAD9" stroke-width="1.5">
+      <circle cx="280" cy="280" r="40"/><circle cx="282" cy="278" r="72"/>
+      <circle cx="278" cy="282" r="106"/><circle cx="283" cy="279" r="142"/>
+      <circle cx="279" cy="281" r="180"/><circle cx="281" cy="280" r="220"/>
+      <circle cx="280" cy="282" r="258"/>
+    </g>
+  </svg>
+  <div class="head-inner">
+    <div class="brand">
+      <h1>LESNOY</h1>
+      <span class="division">Маркетинг · ежемесячный отчёт</span>
+    </div>
+    <div class="period">Июнь 2026 · Ташкент + Бишкек</div>
+    <nav>
+      <button class="tab-btn active" data-tab="summary"><span class="dot dot-sum"></span>Сводка</button>
+      <button class="tab-btn" data-tab="tashkent"><span class="dot dot-tas"></span>Ташкент</button>
+      <button class="tab-btn" data-tab="bishkek"><span class="dot dot-bis"></span>Бишкек</button>
+    </nav>
+  </div>
+</header>
+
+<!-- ==== ПАНЕЛЬ УПРАВЛЕНИЯ (в макете кнопки декоративные) ==== -->
+<div class="toolbar">
+  <select><option>Июнь 2026</option></select>
+  <button>✎ Редактировать</button>
+  <span class="spacer"></span>
+  <button class="ghost">+ Месяц</button>
+  <button class="ghost">⬇ Резервная копия</button>
+  <button class="ghost">Войти</button>
+  <div class="status"><span class="pill">макет</span>Панель управления — внешний вид будущих функций. Роли: просмотр (по умолчанию) · редактор · суперюзер.</div>
+</div>
+
+<main>
+
+  <!-- ============================================================
+       ТАБ 1 · СВОДКА
+       ============================================================ -->
+  <section id="summary" class="panel active">
+
+    <!-- ==== СВОДКА: КЛЮЧЕВЫЕ ЦИФРЫ ==== -->
+    <h2 class="section">Два города за месяц</h2>
+    <p class="section-note">В финальной версии эти цифры считаются автоматически из вкладок городов.</p>
+    <div class="grid">
+      <div class="metric hero"><div class="label">Аудитория Instagram</div><div class="value num">40 832</div><div class="delta up">+2 827 за месяц</div></div>
+      <div class="metric hero"><div class="label">Просмотры Instagram</div><div class="value num">5,38 <span class="unit">млн</span></div><div class="delta flat">4,15 млн + 1,22 млн</div></div>
+      <div class="metric hero"><div class="label">Бюджет таргета</div><div class="value num">$1 250,45</div><div class="delta flat">Ташкент $891,14 · Бишкек $359,31</div></div>
+      <div class="metric hero"><div class="label">Подписки из рекламы</div><div class="value num">2 325</div><div class="delta flat">цена подписчика $0,54</div></div>
+      <div class="metric hero"><div class="label">Заказы Яндекс Еда (CPA)</div><div class="value num">19</div><div class="delta flat">доля рекламных расходов 12,35%</div></div>
+      <div class="metric hero"><div class="label">Отзывы гостей</div><div class="value num">48</div><div class="delta up">85,4% позитивных</div></div>
+    </div>
+
+    <!-- ==== СВОДКА: СРАВНЕНИЕ ГОРОДОВ ==== -->
+    <h2 class="section">Города рядом</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Показатель</th><th>Ташкент</th><th>Бишкек</th></tr></thead>
+        <tbody>
+          <tr><td>Аудитория Instagram</td><td class="n">19 215</td><td class="n">21 617</td></tr>
+          <tr><td>Прирост за месяц</td><td class="n">+2 261 (+13,0%)</td><td class="n">+566 (+2,6%)</td></tr>
+          <tr><td>Просмотры</td><td class="n">4 154 229</td><td class="n">1 222 290</td></tr>
+          <tr><td>Доля просмотров от рекламы</td><td class="n">89,9%</td><td class="n">80,3%</td></tr>
+          <tr><td>Охваченные аккаунты</td><td class="n">1 571 255</td><td class="n">391 013</td></tr>
+          <tr><td>Бюджет таргета</td><td class="n">$891,14</td><td class="n">$359,31</td></tr>
+          <tr><td>Подписки из рекламы</td><td class="n">1 885</td><td class="n">440</td></tr>
+          <tr><td>Цена подписчика</td><td class="n">$0,47</td><td class="n">$0,82</td></tr>
+          <tr><td>Отзывы: позитив / всего</td><td class="n">11 / 14</td><td class="n">30 / 34</td></tr>
+          <tr><td>Доля негатива в отзывах</td><td class="n">21,4%</td><td class="n">11,8%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ==== СВОДКА: ВЫВОДЫ МЕСЯЦА ==== -->
+    <h2 class="section">Выводы месяца</h2>
+    <div class="findings">
+      <div class="finding win"><span class="who tas">Ташкент</span><b>Таргет работает эффективно.</b> Подписчик по $0,32 в кампании Traffic Instagram — сильный результат; кампания дала 98% всех подписок из рекламы.</div>
+      <div class="finding warn"><span class="who tas">Ташкент</span><b>Рост держится на рекламе.</b> 89,9% просмотров — рекламные, 97,5% аудитории просмотров — неподписчики. Плюс 672 отписки на 2 933 подписки (каждый четвёртый уходит). Органика и удержание — зона роста для контента.</div>
+      <div class="finding warn"><span class="who tas">Ташкент</span><b>Негатив — только про кухню.</b> Оба отзыва на 1★ касаются блюд, не сервиса и не атмосферы. Стоит передать на разбор кухне вместе с текущей переработкой меню.</div>
+      <div class="finding win"><span class="who tas">Ташкент</span><b>Яндекс Еда CPA окупается.</b> ДРР 12,35% при конверсии в заказ 11,2%. Но канал уже даёт 73% выручки доставки — зависимость от платного продвижения высокая.</div>
+      <div class="finding"><span class="who bis">Бишкек</span><b>Подписчик дороже, зато лояльность выше.</b> $0,82 против $0,47 в Ташкенте — при этом 88% позитивных отзывов и рост охвата +399%. Имиджевая кампания «Шум леса среди города» дала 240 тыс. охвата, но всего 9 подписок — оценивать её стоит по охвату, не по подпискам.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ТАБ 2 · ТАШКЕНТ
+       Порядок блоков: СММ → PR → Таргет → Доставка → Отзывы
+       ============================================================ -->
+  <section id="tashkent" class="panel tashkent">
+
+    <!-- ==== ТАШКЕНТ: СММ — ИНСТАГРАМ ==== -->
+    <h2 class="section">СММ — Instagram</h2>
+    <div class="grid">
+      <div class="metric hero"><div class="label">Подписчики</div><div class="value num">19 215</div><div class="delta up">+13,0% за месяц</div></div>
+      <div class="metric"><div class="label">Прирост</div><div class="value num">+2 261</div><div class="delta flat">2 933 подписки · 672 отписки</div></div>
+      <div class="metric"><div class="label">Просмотры</div><div class="value num">4,15 <span class="unit">млн</span></div><div class="delta flat">89,9% от рекламы</div></div>
+      <div class="metric"><div class="label">Охваченные аккаунты</div><div class="value num">1,57 <span class="unit">млн</span></div><div class="delta up">+116,4%</div></div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="metric"><div class="label">Просмотры: подписчики / не подписчики</div><div class="value num" style="font-size:22px">2,5% / 97,5%</div><div class="bar"><span style="width:2.5%"></span></div></div>
+      <div class="metric"><div class="label">Доля историй в просмотрах</div><div class="value num" style="font-size:22px">62,7%</div><div class="bar"><span style="width:62.7%"></span></div></div>
+    </div>
+
+    <!-- ==== ТАШКЕНТ: PR ==== -->
+    <h2 class="section">PR · Блогеры</h2>
+    <p class="section-note">Хэштег блогера — по нему отслеживаем публикации; охваты — суммарный охват размещений; сумма чека — счёт гостя (бартер) или стоимость размещения.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Блогер (хэштег)</th><th>Охваты</th><th>Сумма чека</th></tr></thead>
+        <tbody>
+          <tr><td><span class="camp-name">#блогер_1</span></td><td class="n">—</td><td class="n">— сум</td></tr>
+          <tr><td><span class="camp-name">#блогер_2</span></td><td class="n">—</td><td class="n">— сум</td></tr>
+          <tr class="total"><td>Итого</td><td class="n">—</td><td class="n">— сум</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="section-note" style="margin-top:8px">Данных за июнь нет — строки-примеры. В финальной версии редактор добавляет блогеров списком, итог считается автоматически.</p>
+
+    <!-- ==== ТАШКЕНТ: ТАРГЕТ ==== -->
+    <h2 class="section">Таргетированная реклама · Instagram</h2>
+    <div class="grid">
+      <div class="metric hero"><div class="label">Бюджет</div><div class="value num">$891,14</div></div>
+      <div class="metric"><div class="label">Охват</div><div class="value num">1,50 <span class="unit">млн</span></div><div class="note">уникальные люди, увидевшие рекламу</div></div>
+      <div class="metric"><div class="label">Показы</div><div class="value num">3,60 <span class="unit">млн</span></div><div class="note">все показы, один человек может увидеть несколько раз</div></div>
+      <div class="metric"><div class="label">Клики</div><div class="value num">20 381</div><div class="note">переходы по ссылке из объявления</div></div>
+      <div class="metric hero"><div class="label">Подписки</div><div class="value num">1 885</div><div class="delta flat">$0,47 за подписчика</div></div>
+      <div class="metric"><div class="label">Визиты профиля</div><div class="value num">—</div><div class="note">переходы в профиль Instagram из рекламы</div></div>
+    </div>
+
+    <!-- ==== ТАШКЕНТ: ТАБЛИЦА КАМПАНИЙ ==== -->
+    <h2 class="section small">Кампании</h2>
+    <p class="section-note">Названия — как в рекламном кабинете, заполняет таргетолог.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Кампания</th><th>Бюджет</th><th>Охват</th><th>Показы</th><th>Клики</th><th>Подписки</th><th>Цена подписки</th><th>Визиты</th></tr></thead>
+        <tbody>
+          <tr><td><span class="camp-name">Traffic Instagram</span><span class="camp-tag">CPC $0,03 · CTR 1,97%</span></td><td class="n">$584,25</td><td class="n">475 048</td><td class="n">982 385</td><td class="n">19 361</td><td class="n">1 845</td><td class="n">$0,32</td><td class="n">—</td></tr>
+          <tr><td><span class="camp-name">AWR</span><span class="camp-tag">Охватная</span></td><td class="n">$211,41</td><td class="n">1 149 947</td><td class="n">2 571 950</td><td class="n">590</td><td class="n">10</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><span class="camp-name">Direct message</span></td><td class="n">$85,17</td><td class="n">13 437</td><td class="n">—</td><td class="n">—</td><td class="n">28</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><span class="camp-name">Conversion — 2</span></td><td class="n">$8,00</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><span class="camp-name">Conversion</span></td><td class="n">$2,31</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr class="total"><td>Итого</td><td class="n">$891,14</td><td class="n">1 503 686</td><td class="n">3 601 236</td><td class="n">20 381</td><td class="n">1 885</td><td class="n">$0,47</td><td class="n">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ==== ТАШКЕНТ: ДОСТАВКА ==== -->
+    <h2 class="section">Доставка · Яндекс Еда CPA</h2>
+    <p class="section-note">Продвижение за период 27.06 — 03.07</p>
+    <div class="grid">
+      <div class="metric"><div class="label">Просмотры</div><div class="value num">3 919</div></div>
+      <div class="metric"><div class="label">Клики</div><div class="value num">169</div><div class="delta flat">CTR 4,31% — конверсия из просмотра в клик</div></div>
+      <div class="metric hero"><div class="label">Заказы</div><div class="value num">19</div><div class="delta flat">конверсия из клика в заказ 11,24%</div></div>
+      <div class="metric"><div class="label">Выручка от продвижения</div><div class="value num" style="font-size:22px">4 066 000 <span class="unit">сум</span></div></div>
+      <div class="metric"><div class="label">Затраты</div><div class="value num" style="font-size:22px">502 194 <span class="unit">сум</span></div><div class="delta flat">26 431 сум за заказ</div></div>
+      <div class="metric hero"><div class="label">Доля рекламных расходов (ДРР)</div><div class="value num">12,35%</div><div class="delta flat">73,3% от выручки доставки</div></div>
+    </div>
+
+    <!-- ==== ТАШКЕНТ: ОТЗЫВЫ (в самом низу) ==== -->
+    <h2 class="section">Отзывы гостей</h2>
+    <div class="grid">
+      <div class="metric hero"><div class="label">Всего за месяц</div><div class="value num">14</div><div class="delta flat">средняя оценка 4,3</div></div>
+      <div class="metric"><div class="label">Позитив</div><div class="value num" style="color:var(--good)">11</div><div class="bar"><span style="width:78.6%"></span></div><div class="delta flat">78,6% от всех</div></div>
+      <div class="metric"><div class="label">Негатив</div><div class="value num" style="color:var(--bad)">3</div><div class="bar"><span style="width:21.4%;background:var(--bad)"></span></div><div class="delta flat">21,4% от всех</div></div>
+    </div>
+    <div class="finding" style="margin-top:14px">Обе «единицы» — претензии к блюдам, не к сервису. Один отзыв на 3★.</div>
+  </section>
+
+  <!-- ============================================================
+       ТАБ 3 · БИШКЕК
+       Порядок блоков: СММ → PR → Таргет → Отзывы
+       ============================================================ -->
+  <section id="bishkek" class="panel bishkek">
+
+    <!-- ==== БИШКЕК: СММ — ИНСТАГРАМ ==== -->
+    <h2 class="section">СММ — Instagram</h2>
+    <div class="grid">
+      <div class="metric hero"><div class="label">Подписчики</div><div class="value num">21 617</div><div class="delta up">+2,6% за месяц</div></div>
+      <div class="metric"><div class="label">Прирост</div><div class="value num">+566</div><div class="delta flat">890 подписок · 324 отписки</div></div>
+      <div class="metric"><div class="label">Просмотры</div><div class="value num">1,22 <span class="unit">млн</span></div><div class="delta flat">80,3% от рекламы</div></div>
+      <div class="metric"><div class="label">Охваченные аккаунты</div><div class="value num">391 013</div><div class="delta up">+399,1%</div></div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="metric"><div class="label">Просмотры: подписчики / не подписчики</div><div class="value num" style="font-size:22px">5,0% / 95,0%</div><div class="bar"><span style="width:5%"></span></div></div>
+      <div class="metric"><div class="label">Доля историй в просмотрах</div><div class="value num" style="font-size:22px">77,1%</div><div class="bar"><span style="width:77.1%"></span></div></div>
+    </div>
+
+    <!-- ==== БИШКЕК: PR ==== -->
+    <h2 class="section">PR · Блогеры</h2>
+    <p class="section-note">Хэштег блогера — по нему отслеживаем публикации; охваты — суммарный охват размещений; сумма чека — счёт гостя (бартер) или стоимость размещения.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Блогер (хэштег)</th><th>Охваты</th><th>Сумма чека</th></tr></thead>
+        <tbody>
+          <tr><td><span class="camp-name">#блогер_1</span></td><td class="n">—</td><td class="n">— сом</td></tr>
+          <tr><td><span class="camp-name">#блогер_2</span></td><td class="n">—</td><td class="n">— сом</td></tr>
+          <tr class="total"><td>Итого</td><td class="n">—</td><td class="n">— сом</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="section-note" style="margin-top:8px">Данных за июнь нет — строки-примеры. В финальной версии редактор добавляет блогеров списком, итог считается автоматически.</p>
+
+    <!-- ==== БИШКЕК: ТАРГЕТ ==== -->
+    <h2 class="section">Таргетированная реклама · Instagram</h2>
+    <div class="grid">
+      <div class="metric hero"><div class="label">Бюджет</div><div class="value num">$359,31</div></div>
+      <div class="metric"><div class="label">Охват</div><div class="value num">377 670</div><div class="note">уникальные люди, увидевшие рекламу</div></div>
+      <div class="metric"><div class="label">Показы</div><div class="value num">910 589</div><div class="note">все показы, один человек может увидеть несколько раз</div></div>
+      <div class="metric"><div class="label">Клики</div><div class="value num">—</div><div class="note">переходы по ссылке из объявления</div></div>
+      <div class="metric hero"><div class="label">Подписки</div><div class="value num">440</div><div class="delta flat">$0,82 за подписчика</div></div>
+      <div class="metric"><div class="label">Визиты профиля</div><div class="value num">8 211</div><div class="note">переходы в профиль Instagram из рекламы</div></div>
+    </div>
+
+    <!-- ==== БИШКЕК: ТАБЛИЦА КАМПАНИЙ ==== -->
+    <h2 class="section small">Кампании</h2>
+    <p class="section-note">Названия — как в рекламном кабинете, заполняет таргетолог.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Кампания</th><th>Бюджет</th><th>Охват</th><th>Показы</th><th>Клики</th><th>Подписки</th><th>Цена подписки</th><th>Визиты</th></tr></thead>
+        <tbody>
+          <tr><td><span class="camp-name">Traffic Instagram</span></td><td class="n">$213,91</td><td class="n">144 140</td><td class="n">314 686</td><td class="n">—</td><td class="n">409</td><td class="n">$0,52</td><td class="n">6 466</td></tr>
+          <tr><td><span class="camp-name">Message</span></td><td class="n">$69,69</td><td class="n">21 738</td><td class="n">46 237</td><td class="n">—</td><td class="n">15</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><span class="camp-name">Шум леса среди города</span><span class="camp-tag">Имиджевая · оценка по охвату</span></td><td class="n">$49,06</td><td class="n">239 519</td><td class="n">539 027</td><td class="n">—</td><td class="n">9</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><span class="camp-name">Изысканные вечера</span></td><td class="n">$26,65</td><td class="n">—</td><td class="n">10 639</td><td class="n">—</td><td class="n">7</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr class="total"><td>Итого</td><td class="n">$359,31</td><td class="n">377 670</td><td class="n">910 589</td><td class="n">—</td><td class="n">440</td><td class="n">$0,82</td><td class="n">8 211</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ==== БИШКЕК: ОТЗЫВЫ (в самом низу) ==== -->
+    <h2 class="section">Отзывы гостей</h2>
+    <div class="grid">
+      <div class="metric hero"><div class="label">Всего за месяц</div><div class="value num">34</div></div>
+      <div class="metric"><div class="label">Позитив</div><div class="value num" style="color:var(--good)">30</div><div class="bar"><span style="width:88.2%"></span></div><div class="delta flat">88,2% от всех</div></div>
+      <div class="metric"><div class="label">Негатив</div><div class="value num" style="color:var(--bad)">4</div><div class="bar"><span style="width:11.8%;background:var(--bad)"></span></div><div class="delta flat">11,8% от всех</div></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>LESNOY · FIBONACCI FAMILY · Отчёт по маркетингу за июнь 2026 · подготовлено внутренней командой</footer>
+
+<script>
+  /* Единственный скрипт макета — переключение табов */
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
